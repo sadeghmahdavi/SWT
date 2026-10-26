@@ -4,6 +4,7 @@ autopilot/core/BrakeControllerTest.class
 autopilot/core/AutoDriverTest$4.class
 autopilot/core/AutoDriverTest$3.class
 autopilot/core/GearBoxTest.class
+autopilot/core/SteeringControllerTest.class
 autopilot/core/AdaptiveCruiseTest.class
 autopilot/core/AutoDriverTest$1.class
 autopilot/core/AutoDriverTest$5.class
