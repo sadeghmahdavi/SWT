@@ -1,15 +1,19 @@
 
 package autopilot.core;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+
 class AdaptiveCruiseTest {
-        
+
+    private AdaptiveCruise cruise;
+
     @BeforeEach
     void setUp() {
-        AdaptiveCruise cruise = new AdaptiveCruise(100.0);
+        cruise = new AdaptiveCruise(100.0);
     }
 
     private static final double DELTA = 1e-9;
@@ -195,7 +199,7 @@ class AdaptiveCruiseTest {
 
     @Test
     void Should_AccelerateByRemainingDifference_When_TargetSpeedDifferenceIsBelowFive() {
-        AdaptiveCruise cruise = new AdaptiveCruise(82.0);
+        cruise = new AdaptiveCruise(82.0);
 
         AdaptiveCruise.Decision decision =
                 cruise.update(80.0, 41.0);
