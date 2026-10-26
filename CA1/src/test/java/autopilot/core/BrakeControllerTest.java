@@ -3,6 +3,10 @@ package autopilot.core;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class BrakeControllerTest {
@@ -185,4 +189,26 @@ class BrakeControllerTest {
 
         assertEquals(90.0, pressure, DELTA);
     }
+
+    
+    @ParameterizedTest
+    @EnumSource(
+        value = GearBox.Gear.class,
+        names = {"R", "N", "D"}
+    )
+    void Should_ResetAbsAndActivateWarning_When_EmergencyBrakeUsesNonParkGear(
+            GearBox.Gear gear) {
+
+        controller.apply(95.0, 40.0, gear);
+
+        controller.emergencyBrake(gear);
+
+        assertEquals(100.0, controller.getPressure(), DELTA);
+        assertTrue(controller.isWarningActive());
+
+        double nextPulse = controller.apply(95.0, 40.0, gear);
+
+        assertEquals(90.0, nextPulse, DELTA);
+    }
+
 }

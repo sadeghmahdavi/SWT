@@ -3,6 +3,9 @@ package autopilot.core;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class AdaptiveCruiseTest {
@@ -181,4 +184,29 @@ class AdaptiveCruiseTest {
 
         assertDecision(decision, AdaptiveCruise.Mode.HOLD, 0.0);
     }
+    
+    @ParameterizedTest(
+        name = "{index}: speed={0}, distance={1}, wasBraking={2}"
+    )
+    @CsvFileSource(
+        resources = "/autopilot/core/adaptive-cruise-cases.csv",
+        numLinesToSkip = 1
+    )
+    void Should_ReturnExpectedDecision_When_CsvScenarioIsApplied(
+            double speed,
+            double distance,
+            boolean wasBraking,
+            AdaptiveCruise.Mode expectedMode,
+            double expectedAmount) {
+
+        if (wasBraking) {
+            updateCruise(speed, 0.0);
+        }
+
+        AdaptiveCruise.Decision decision =
+                updateCruise(speed, distance);
+
+        assertDecision(decision, expectedMode, expectedAmount);
+    }
+
 }
