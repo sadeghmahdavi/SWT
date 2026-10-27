@@ -2,16 +2,15 @@ package autopilot.core;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class AdaptiveCruiseTest {
 
     private AdaptiveCruise cruise;
-
     private static final double DELTA = 1e-9;
 
     @BeforeEach
@@ -32,6 +31,15 @@ class AdaptiveCruiseTest {
         assertEquals(expectedAmount, decision.amount(), DELTA);
     }
 
+    @ParameterizedTest
+    @ValueSource(doubles = {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NaN, -1.0})
+    void Should_ThrowException_When_TargetSpeedIsInvalid(double invalidTargetSpeed) {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new AdaptiveCruise(invalidTargetSpeed)
+        );
+    }
+
     @Test
     void Should_ReturnExpectedSafeDistance_When_GivenValidSpeed() {
         assertEquals(40.0, cruise.safeDistanceFor(80.0), DELTA);
@@ -42,51 +50,30 @@ class AdaptiveCruiseTest {
         assertEquals(0.0, cruise.safeDistanceFor(0.0), DELTA);
     }
 
-    @Test
-    void Should_ThrowException_When_SpeedIsInfinite() {
+    @ParameterizedTest
+    @ValueSource(doubles = {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NaN, -10.0})
+    void Should_ThrowException_When_SafeDistanceSpeedIsInvalid(double invalidSpeed) {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> cruise.safeDistanceFor(Double.POSITIVE_INFINITY)
+                () -> cruise.safeDistanceFor(invalidSpeed)
         );
     }
 
-    @Test
-    void Should_ThrowException_When_SpeedIsNegative() {
+    @ParameterizedTest
+    @ValueSource(doubles = {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NaN, -10.0})
+    void Should_ThrowException_When_UpdateSpeedIsInvalid(double invalidSpeed) {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> cruise.safeDistanceFor(-10.0)
+                () -> updateCruise(invalidSpeed, 30.0)
         );
     }
 
-    @Test
-    void Should_ThrowException_When_UpdateSpeedIsInfinite() {
+    @ParameterizedTest
+    @ValueSource(doubles = {Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NaN, -10.0})
+    void Should_ThrowException_When_UpdateDistanceIsInvalid(double invalidDistance) {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> updateCruise(Double.POSITIVE_INFINITY, 30.0)
-        );
-    }
-
-    @Test
-    void Should_ThrowException_When_UpdateSpeedIsNegative() {
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> updateCruise(-10.0, 30.0)
-        );
-    }
-
-    @Test
-    void Should_ThrowException_When_UpdateDistanceIsInfinite() {
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> updateCruise(50.0, Double.POSITIVE_INFINITY)
-        );
-    }
-
-    @Test
-    void Should_ThrowException_When_UpdateDistanceIsNegative() {
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> updateCruise(50.0, -10.0)
+                () -> updateCruise(50.0, invalidDistance)
         );
     }
 
@@ -99,15 +86,6 @@ class AdaptiveCruiseTest {
                 AdaptiveCruise.Mode.EMERGENCY_BRAKE,
                 100.0
         );
-    }
-
-    @Test
-    void Should_ContinueBraking_When_DistanceIsBelowReleaseThreshold() {
-        updateCruise(80.0, 20.0);
-
-        AdaptiveCruise.Decision decision = updateCruise(80.0, 45.0);
-
-        assertDecision(decision, AdaptiveCruise.Mode.BRAKE, 10.0);
     }
 
     @Test
@@ -156,6 +134,16 @@ class AdaptiveCruiseTest {
     }
 
     @Test
+    void Should_NotApplyHysteresisBrakeOnSubsequentUpdate_When_BrakingWasAlreadyReleased() {
+        updateCruise(80.0, 20.0);
+        updateCruise(80.0, 48.0);
+
+        AdaptiveCruise.Decision subsequentDecision = updateCruise(80.0, 45.0);
+
+        assertDecision(subsequentDecision, AdaptiveCruise.Mode.ACCELERATE, 5.0);
+    }
+
+    @Test
     void Should_AccelerateByMaximumStep_When_SpeedIsBelowTargetByMoreThanFive() {
         AdaptiveCruise.Decision decision = updateCruise(80.0, 41.0);
 
@@ -184,7 +172,7 @@ class AdaptiveCruiseTest {
 
         assertDecision(decision, AdaptiveCruise.Mode.HOLD, 0.0);
     }
-    
+
     @ParameterizedTest(
         name = "{index}: speed={0}, distance={1}, wasBraking={2}"
     )
@@ -208,5 +196,4 @@ class AdaptiveCruiseTest {
 
         assertDecision(decision, expectedMode, expectedAmount);
     }
-
 }
