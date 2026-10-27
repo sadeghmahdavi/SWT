@@ -6,7 +6,9 @@ import autopilot.sensor.LaneSensor;
 import autopilot.sensor.ObstacleSensor;
 import autopilot.sensor.SpeedSensor;
 
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -69,37 +71,19 @@ class AutoDriverTest {
     }
 
 
-    @Test
-    void Should_ReturnNegativeSteeringAngle_When_LaneOffsetExceedsPositiveThreshold() {
-
-        laneSensor = () -> POSITIVE_LANE_OFFSET_METERS;
+    @ParameterizedTest
+    @CsvSource({
+        "1.0, -45.0",
+        "-1.0, 45.0"
+    })
+    void Should_ReturnExpectedSteeringAngle_When_LaneOffsetExceedsThreshold(
+            double laneOffset, double expectedSteeringAngle) {
+        laneSensor = () -> laneOffset;
         autoDriver = createAutoDriver();
 
-        AutoDriver.DriveResult result =
-                autoDriver.tick(GearBox.Gear.D);
+        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
 
-        assertEquals(
-                -LANE_CORRECTION_DEGREES,
-                result.steeringAngleDegrees(),
-                DELTA
-        );
-    }
-
-
-    @Test
-    void Should_ReturnPositiveSteeringAngle_When_LaneOffsetExceedsNegativeThreshold() {
-
-        laneSensor = () -> NEGATIVE_LANE_OFFSET_METERS;
-        autoDriver = createAutoDriver();
-
-        AutoDriver.DriveResult result =
-                autoDriver.tick(GearBox.Gear.D);
-
-        assertEquals(
-                LANE_CORRECTION_DEGREES,
-                result.steeringAngleDegrees(),
-                DELTA
-        );
+        assertEquals(expectedSteeringAngle, result.steeringAngleDegrees(), DELTA);
     }
 
 
