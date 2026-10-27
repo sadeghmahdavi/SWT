@@ -33,7 +33,6 @@ class BrakeControllerTest {
         controller = new BrakeController();
     }
 
-
     @ParameterizedTest
     @ValueSource(doubles = {
             Double.POSITIVE_INFINITY,
@@ -44,16 +43,21 @@ class BrakeControllerTest {
     void Should_RejectInvalidPressureAndPreserveState_When_RequestedPressureIsInvalid(
             double invalidPressure) {
 
-        controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D);
+        controller.apply(
+                NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D
+        );
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> controller.apply(invalidPressure, ABS_SPEED, GearBox.Gear.D)
+                () -> controller.apply(
+                        invalidPressure, ABS_SPEED, GearBox.Gear.D
+                )
         );
 
-        assertEquals(NORMAL_PRESSURE, controller.getPressure(), DELTA);
+        assertEquals(
+                NORMAL_PRESSURE, controller.getPressure(), DELTA
+        );
     }
-
 
     @ParameterizedTest
     @ValueSource(doubles = {
@@ -65,76 +69,107 @@ class BrakeControllerTest {
     void Should_RejectInvalidSpeedAndPreserveState_When_SpeedIsInvalid(
             double invalidSpeed) {
 
-        controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D);
+        controller.apply(
+                NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D
+        );
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> controller.apply(NORMAL_PRESSURE, invalidSpeed, GearBox.Gear.D)
+                () -> controller.apply(
+                        NORMAL_PRESSURE, invalidSpeed, GearBox.Gear.D
+                )
         );
 
-        assertEquals(NORMAL_PRESSURE, controller.getPressure(), DELTA);
+        assertEquals(
+                NORMAL_PRESSURE, controller.getPressure(), DELTA
+        );
     }
-
 
     @Test
     void Should_RejectNullGearAndPreserveState_When_ApplyingBrake() {
 
-        controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D);
+        controller.apply(
+                NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D
+        );
 
         NullPointerException exception = assertThrows(
                 NullPointerException.class,
-                () -> controller.apply(NORMAL_PRESSURE, LOW_SPEED, null)
+                () -> controller.apply(
+                        NORMAL_PRESSURE, LOW_SPEED, null
+                )
         );
 
-        assertEquals("gear must not be null", exception.getMessage());
-        assertEquals(NORMAL_PRESSURE, controller.getPressure(), DELTA);
-    }
+        assertEquals(
+                "gear must not be null",
+                exception.getMessage()
+        );
 
+        assertEquals(
+                NORMAL_PRESSURE, controller.getPressure(), DELTA
+        );
+    }
 
     @Test
     void Should_RejectParkGearAndPreserveState_When_ApplyingBrake() {
 
-        controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D);
+        controller.apply(
+                NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D
+        );
 
         assertThrows(
                 IllegalStateException.class,
-                () -> controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.P)
+                () -> controller.apply(
+                        NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.P
+                )
         );
 
-        assertEquals(NORMAL_PRESSURE, controller.getPressure(), DELTA);
+        assertEquals(
+                NORMAL_PRESSURE, controller.getPressure(), DELTA
+        );
     }
-
 
     @Test
     void Should_RejectEmergencyBrake_When_GearIsPark() {
 
-        controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D);
+        controller.apply(
+                NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D
+        );
 
         assertThrows(
                 IllegalStateException.class,
                 () -> controller.emergencyBrake(GearBox.Gear.P)
         );
 
-        assertEquals(NORMAL_PRESSURE, controller.getPressure(), DELTA);
+        assertEquals(
+                NORMAL_PRESSURE, controller.getPressure(), DELTA
+        );
+
         assertFalse(controller.isWarningActive());
     }
-
 
     @Test
     void Should_RejectEmergencyBrake_When_GearIsNull() {
 
-        controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D);
+        controller.apply(
+                NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D
+        );
 
         NullPointerException exception = assertThrows(
                 NullPointerException.class,
                 () -> controller.emergencyBrake(null)
         );
 
-        assertEquals("gear must not be null", exception.getMessage());
-        assertEquals(NORMAL_PRESSURE, controller.getPressure(), DELTA);
+        assertEquals(
+                "gear must not be null",
+                exception.getMessage()
+        );
+
+        assertEquals(
+                NORMAL_PRESSURE, controller.getPressure(), DELTA
+        );
+
         assertFalse(controller.isWarningActive());
     }
-
 
     @Test
     void Should_AlternateAbsPulses_When_BothThresholdsAreExceeded() {
@@ -157,7 +192,6 @@ class BrakeControllerTest {
         assertFalse(controller.isWarningActive());
     }
 
-
     @Test
     void Should_CapPressureAtMaximum_When_RequestExceedsLimit() {
 
@@ -166,11 +200,17 @@ class BrakeControllerTest {
         );
 
         assertEquals(MAX_PRESSURE, actual, DELTA);
+        assertEquals(
+                MAX_PRESSURE, controller.getPressure(), DELTA
+        );
     }
 
-
-    @Test
-    void Should_ResetAbsPulseSequence_When_PressureDropsBelowThreshold() {
+    @ParameterizedTest
+    @ValueSource(doubles = {
+            0.0, 70.0, ABS_PRESSURE_THRESHOLD
+    })
+    void Should_ResetAbsPulseSequence_When_PressureNoLongerExceedsThreshold(
+            double nonAbsPressure) {
 
         double firstPulse = controller.apply(
                 HIGH_PRESSURE, ABS_SPEED, GearBox.Gear.D
@@ -179,10 +219,10 @@ class BrakeControllerTest {
         assertEquals(ABS_HIGH_PULSE, firstPulse, DELTA);
 
         double normalPressure = controller.apply(
-                70.0, ABS_SPEED, GearBox.Gear.D
+                nonAbsPressure, ABS_SPEED, GearBox.Gear.D
         );
 
-        assertEquals(70.0, normalPressure, DELTA);
+        assertEquals(nonAbsPressure, normalPressure, DELTA);
 
         double pulseAfterReset = controller.apply(
                 HIGH_PRESSURE, ABS_SPEED, GearBox.Gear.D
@@ -190,7 +230,6 @@ class BrakeControllerTest {
 
         assertEquals(ABS_HIGH_PULSE, pulseAfterReset, DELTA);
     }
-
 
     @Test
     void Should_ResetAbsPulseSequence_When_SpeedDropsToThreshold() {
@@ -214,7 +253,6 @@ class BrakeControllerTest {
         assertEquals(ABS_HIGH_PULSE, pulseAfterReset, DELTA);
     }
 
-
     @ParameterizedTest
     @EnumSource(
             value = GearBox.Gear.class,
@@ -231,7 +269,10 @@ class BrakeControllerTest {
 
         controller.emergencyBrake(gear);
 
-        assertEquals(MAX_PRESSURE, controller.getPressure(), DELTA);
+        assertEquals(
+                MAX_PRESSURE, controller.getPressure(), DELTA
+        );
+
         assertTrue(controller.isWarningActive());
 
         double pulseAfterReset = controller.apply(
@@ -241,15 +282,14 @@ class BrakeControllerTest {
         assertEquals(ABS_HIGH_PULSE, pulseAfterReset, DELTA);
     }
 
-
-
-@ParameterizedTest(name = "pressure={0}, speed={1}")
+    @ParameterizedTest(name = "pressure={0}, speed={1}")
     @CsvSource({
-            "0.0,  40.0",  
-            "50.0, 40.0", 
-            "80.0, 40.0",   
-            "95.0, 30.0",   
-            "95.0, 25.0"   
+            "0.0, 40.0",
+            "50.0, 40.0",
+            "50.0, 0.0",
+            "80.0, 40.0",
+            "95.0, 30.0",
+            "95.0, 25.0"
     })
     void Should_ReturnRequestedPressure_When_AbsThresholdsAreNotExceeded(
             double requestedPressure, double speed) {
@@ -261,11 +301,10 @@ class BrakeControllerTest {
         assertEquals(requestedPressure, actual, DELTA);
     }
 
-
     @ParameterizedTest(name = "pressure={0}, speed={1}")
     @CsvSource({
-            "80.0001, 40.0",  
-            "95.0,    30.0001" 
+            "80.0001, 40.0",
+            "95.0, 30.0001"
     })
     void Should_ActivateAbs_When_InputsAreJustAboveThresholds(
             double requestedPressure, double speed) {
@@ -275,5 +314,36 @@ class BrakeControllerTest {
         );
 
         assertEquals(ABS_HIGH_PULSE, actual, DELTA);
+    }
+
+    @Test
+    void Should_PreserveActiveWarningAndAbsSequence_When_InvalidSpeedIsRejected() {
+
+        controller.emergencyBrake(GearBox.Gear.D);
+
+        double firstPulse = controller.apply(
+                HIGH_PRESSURE, ABS_SPEED, GearBox.Gear.D
+        );
+
+        assertEquals(ABS_HIGH_PULSE, firstPulse, DELTA);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> controller.apply(
+                        HIGH_PRESSURE, -0.01, GearBox.Gear.D
+                )
+        );
+
+        assertEquals(
+                ABS_HIGH_PULSE, controller.getPressure(), DELTA
+        );
+
+        assertTrue(controller.isWarningActive());
+
+        double nextPulse = controller.apply(
+                HIGH_PRESSURE, ABS_SPEED, GearBox.Gear.D
+        );
+
+        assertEquals(ABS_LOW_PULSE, nextPulse, DELTA);
     }
 }

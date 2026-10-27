@@ -15,3 +15,5 @@ speed,distance,wasBraking,expectedMode,expectedAmount
 0,0,false,EMERGENCY_BRAKE,100
 0,1,false,ACCELERATE,5
 120,100,false,HOLD,0
+80,20,true,EMERGENCY_BRAKE,100
+

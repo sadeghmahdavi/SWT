@@ -3,11 +3,13 @@ package autopilot.core;
 
 import autopilot.core.GearBox.Gear;
 import autopilot.exception.IllegalGearChangeException;
+import autopilot.exception.SensorFailureException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.stream.Stream;
@@ -41,7 +43,6 @@ class GearBoxTest {
         }
     }
 
-
     static Stream<Arguments> allowedTransitions() {
         return Stream.of(
                 arguments(Gear.P, Gear.R, 0.0),
@@ -58,7 +59,9 @@ class GearBoxTest {
     @ParameterizedTest(name = "{index}: {0} to {1} at {2} km/h")
     @MethodSource("allowedTransitions")
     void Should_ChangeGear_When_TransitionIsAllowed(
-            Gear initialGear, Gear targetGear, double speed) {
+            Gear initialGear,
+            Gear targetGear,
+            double speed) {
 
         startIn(initialGear);
         speedKmh = speed;
@@ -67,7 +70,6 @@ class GearBoxTest {
 
         assertEquals(targetGear, gearBox.getCurrentGear());
     }
-
 
     static Stream<Arguments> forbiddenTransitions() {
         return Stream.of(
@@ -88,7 +90,9 @@ class GearBoxTest {
     @ParameterizedTest(name = "{index}: reject {0} to {1} at {2} km/h")
     @MethodSource("forbiddenTransitions")
     void Should_RejectTransitionAndKeepGear_When_TransitionIsForbidden(
-            Gear initialGear, Gear targetGear, double speed) {
+            Gear initialGear,
+            Gear targetGear,
+            double speed) {
 
         startIn(initialGear);
         speedKmh = speed;
@@ -100,7 +104,6 @@ class GearBoxTest {
 
         assertEquals(initialGear, gearBox.getCurrentGear());
     }
-
 
     static Stream<Double> invalidSpeeds() {
         return Stream.of(
@@ -126,7 +129,6 @@ class GearBoxTest {
         assertEquals(Gear.P, gearBox.getCurrentGear());
     }
 
-
     @Test
     void Should_ThrowNullPointerException_When_TargetGearIsNull() {
 
@@ -138,16 +140,36 @@ class GearBoxTest {
         assertEquals(Gear.P, gearBox.getCurrentGear());
     }
 
+    @ParameterizedTest
+    @EnumSource(Gear.class)
+    void Should_SkipSensorReading_When_TargetEqualsCurrentGear(
+            Gear currentGear) {
 
-    @Test
-    void Should_SkipSensorReading_When_TargetEqualsCurrentGear() {
+        startIn(currentGear);
 
-        GearBox boxWithFailingSensor = new GearBox(() -> {
+        gearBox.setSpeedSensor(() -> {
             throw new AssertionError("The sensor must not be read");
         });
 
-        boxWithFailingSensor.changeTo(Gear.P);
+        gearBox.changeTo(currentGear);
 
-        assertEquals(Gear.P, boxWithFailingSensor.getCurrentGear());
+        assertEquals(currentGear, gearBox.getCurrentGear());
+    }
+
+    @Test
+    void Should_PreserveGearAndPropagateException_When_SpeedSensorFails() {
+
+        startIn(Gear.D);
+
+        gearBox.setSpeedSensor(() -> {
+            throw new SensorFailureException("Speed sensor failed");
+        });
+
+        assertThrows(
+                SensorFailureException.class,
+                () -> gearBox.changeTo(Gear.R)
+        );
+
+        assertEquals(Gear.D, gearBox.getCurrentGear());
     }
 }
