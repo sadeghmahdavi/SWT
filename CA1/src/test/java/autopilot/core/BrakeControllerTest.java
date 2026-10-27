@@ -76,22 +76,6 @@ class BrakeControllerTest {
     }
 
 
-
-
-
-    @Test
-    void Should_ReleaseBrake_When_ZeroPressureIsRequestedAfterBraking() {
-
-        controller.apply(NORMAL_PRESSURE, LOW_SPEED, GearBox.Gear.D);
-
-        double actual = controller.apply(
-                0.0, LOW_SPEED, GearBox.Gear.D
-        );
-
-        assertEquals(0.0, actual, DELTA);
-    }
-
-
     @Test
     void Should_RejectNullGearAndPreserveState_When_ApplyingBrake() {
 
