@@ -4,6 +4,7 @@ package autopilot.core;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -75,17 +76,7 @@ class BrakeControllerTest {
     }
 
 
-    @ParameterizedTest
-    @ValueSource(doubles = {0.0, 50.0})
-    void Should_ReturnRequestedPressure_When_AbsIsNotActivated(
-            double requestedPressure) {
 
-        double actual = controller.apply(
-                requestedPressure, ABS_SPEED, GearBox.Gear.D
-        );
-
-        assertEquals(requestedPressure, actual, DELTA);
-    }
 
 
     @Test
@@ -184,65 +175,6 @@ class BrakeControllerTest {
 
 
     @Test
-    void Should_NotActivateAbs_When_PressureEqualsThreshold() {
-
-        double actual = controller.apply(
-                ABS_PRESSURE_THRESHOLD, ABS_SPEED, GearBox.Gear.D
-        );
-
-        assertEquals(ABS_PRESSURE_THRESHOLD, actual, DELTA);
-    }
-
-
-    @Test
-    void Should_NotActivateAbs_When_SpeedEqualsThreshold() {
-
-        double actual = controller.apply(
-                HIGH_PRESSURE, ABS_SPEED_THRESHOLD, GearBox.Gear.D
-        );
-
-        assertEquals(HIGH_PRESSURE, actual, DELTA);
-    }
-
-
-    @Test
-    void Should_NotActivateAbs_When_SpeedIsBelowThreshold() {
-
-        double actual = controller.apply(
-                HIGH_PRESSURE, 25.0, GearBox.Gear.D
-        );
-
-        assertEquals(HIGH_PRESSURE, actual, DELTA);
-    }
-
-
-    @Test
-    void Should_ActivateAbs_When_PressureIsJustAboveThreshold() {
-
-        double actual = controller.apply(
-                ABS_PRESSURE_THRESHOLD + 0.0001,
-                ABS_SPEED,
-                GearBox.Gear.D
-        );
-
-        assertEquals(ABS_HIGH_PULSE, actual, DELTA);
-    }
-
-
-    @Test
-    void Should_ActivateAbs_When_SpeedIsJustAboveThreshold() {
-
-        double actual = controller.apply(
-                HIGH_PRESSURE,
-                ABS_SPEED_THRESHOLD + 0.0001,
-                GearBox.Gear.D
-        );
-
-        assertEquals(ABS_HIGH_PULSE, actual, DELTA);
-    }
-
-
-    @Test
     void Should_CapPressureAtMaximum_When_RequestExceedsLimit() {
 
         double actual = controller.apply(
@@ -323,5 +255,41 @@ class BrakeControllerTest {
         );
 
         assertEquals(ABS_HIGH_PULSE, pulseAfterReset, DELTA);
+    }
+
+
+
+@ParameterizedTest(name = "pressure={0}, speed={1}")
+    @CsvSource({
+            "0.0,  40.0",  
+            "50.0, 40.0", 
+            "80.0, 40.0",   
+            "95.0, 30.0",   
+            "95.0, 25.0"   
+    })
+    void Should_ReturnRequestedPressure_When_AbsThresholdsAreNotExceeded(
+            double requestedPressure, double speed) {
+
+        double actual = controller.apply(
+                requestedPressure, speed, GearBox.Gear.D
+        );
+
+        assertEquals(requestedPressure, actual, DELTA);
+    }
+
+
+    @ParameterizedTest(name = "pressure={0}, speed={1}")
+    @CsvSource({
+            "80.0001, 40.0",  
+            "95.0,    30.0001" 
+    })
+    void Should_ActivateAbs_When_InputsAreJustAboveThresholds(
+            double requestedPressure, double speed) {
+
+        double actual = controller.apply(
+                requestedPressure, speed, GearBox.Gear.D
+        );
+
+        assertEquals(ABS_HIGH_PULSE, actual, DELTA);
     }
 }
