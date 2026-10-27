@@ -12,16 +12,21 @@ import static org.junit.jupiter.api.Assertions.*;
 class AutoDriverTest {
 
     private static final double TARGET_SPEED_KMH = 80.0;
-    private static final double CURRENT_SPEED_KMH = 80.0;              
-    private static final double SAFE_OBSTACLE_DISTANCE_METERS = 100.0; 
-    private static final double CENTERED_LANE_OFFSET_METERS = 0.0;     
-    private static final double POSITIVE_LANE_OFFSET_METERS = 1.0;     
-    private static final double NEGATIVE_LANE_OFFSET_METERS = -1.0;    
+    private static final double CURRENT_SPEED_KMH = 80.0;
+    private static final double SAFE_OBSTACLE_DISTANCE_METERS = 100.0;
+    private static final double CENTERED_LANE_OFFSET_METERS = 0.0;
+    private static final double POSITIVE_LANE_OFFSET_METERS = 1.0;
+    private static final double NEGATIVE_LANE_OFFSET_METERS = -1.0;
+    private static final double LANE_THRESHOLD_METERS = 0.5;
+    private static final double LANE_CORRECTION_DEGREES = 45.0;
     private static final double NO_BRAKE_PRESSURE = 0.0;
     private static final double NO_STEERING_ANGLE = 0.0;
-    private static final double SAFE_MODE_BRAKE_PRESSURE = 30.0;       
+    private static final double SAFE_MODE_BRAKE_PRESSURE = 30.0;
+    private static final double DELTA = 1e-9;
+
     private static final String SPEED_SENSOR_FAILURE_MESSAGE = "Speed sensor failed";
     private static final String OBSTACLE_SENSOR_FAILURE_MESSAGE = "Obstacle sensor failed";
+    private static final String LANE_SENSOR_FAILURE_MESSAGE = "Lane sensor failed";
 
     private SpeedSensor speedSensor;
     private ObstacleSensor obstacleSensor;
@@ -37,39 +42,114 @@ class AutoDriverTest {
     }
 
     @Test
-    void tick_withNormalConditions_doesNotApplyBrake() {
-        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
-
-        assertEquals(NO_BRAKE_PRESSURE, result.brakePressure());
+    void Should_ThrowNullPointerException_When_SpeedSensorIsNull() {
+        NullPointerException ex = assertThrows(
+                NullPointerException.class,
+                () -> new AutoDriver(null, obstacleSensor, laneSensor, TARGET_SPEED_KMH)
+        );
+        assertEquals("speedSensor must not be null", ex.getMessage());
     }
 
     @Test
-    void tick_withNormalConditions_doesNotEnterSafeMode() {
+    void Should_ThrowNullPointerException_When_ObstacleSensorIsNull() {
+        NullPointerException ex = assertThrows(
+                NullPointerException.class,
+                () -> new AutoDriver(speedSensor, null, laneSensor, TARGET_SPEED_KMH)
+        );
+        assertEquals("obstacleSensor must not be null", ex.getMessage());
+    }
+
+    @Test
+    void Should_ThrowNullPointerException_When_LaneSensorIsNull() {
+        NullPointerException ex = assertThrows(
+                NullPointerException.class,
+                () -> new AutoDriver(speedSensor, obstacleSensor, null, TARGET_SPEED_KMH)
+        );
+        assertEquals("laneSensor must not be null", ex.getMessage());
+    }
+
+    @Test
+    void Should_NotApplyBrake_When_ConditionsAreNormal() {
+        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
+
+        assertEquals(NO_BRAKE_PRESSURE, result.brakePressure(), DELTA);
+        assertEquals(AdaptiveCruise.Mode.HOLD, result.cruiseMode());
+    }
+
+    @Test
+    void Should_NotEnterSafeMode_When_ConditionsAreNormal() {
         AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
 
         assertFalse(result.safeMode());
+        assertFalse(result.warningActive());
     }
 
     @Test
-    void tick_whenLaneOffsetIsPositive_steersToNegativeAngle() {
+    void Should_SteerToExpectedNegativeAngle_When_LaneOffsetExceedsPositiveThreshold() {
         autoDriver = createAutoDriverWithLaneOffset(POSITIVE_LANE_OFFSET_METERS);
+        double expectedAngle = new SteeringController().update(-LANE_CORRECTION_DEGREES, CURRENT_SPEED_KMH);
 
         AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
 
-        assertTrue(result.steeringAngleDegrees() < NO_STEERING_ANGLE);
+        assertEquals(expectedAngle, result.steeringAngleDegrees(), DELTA);
     }
 
     @Test
-    void tick_whenLaneOffsetIsNegative_steersToPositiveAngle() {
+    void Should_SteerToExpectedPositiveAngle_When_LaneOffsetExceedsNegativeThreshold() {
         autoDriver = createAutoDriverWithLaneOffset(NEGATIVE_LANE_OFFSET_METERS);
+        double expectedAngle = new SteeringController().update(LANE_CORRECTION_DEGREES, CURRENT_SPEED_KMH);
 
         AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
 
-        assertTrue(result.steeringAngleDegrees() > NO_STEERING_ANGLE);
+        assertEquals(expectedAngle, result.steeringAngleDegrees(), DELTA);
     }
 
     @Test
-    void tick_whenSpeedSensorFails_entersSafeMode() {
+    void Should_SelfCenterSteering_When_LaneOffsetIsAtPositiveThreshold() {
+        autoDriver = createAutoDriverWithLaneOffset(LANE_THRESHOLD_METERS);
+
+        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
+
+        assertEquals(NO_STEERING_ANGLE, result.steeringAngleDegrees(), DELTA);
+    }
+
+    @Test
+    void Should_SelfCenterSteering_When_LaneOffsetIsAtNegativeThreshold() {
+        autoDriver = createAutoDriverWithLaneOffset(-LANE_THRESHOLD_METERS);
+
+        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
+
+        assertEquals(NO_STEERING_ANGLE, result.steeringAngleDegrees(), DELTA);
+    }
+
+    @Test
+    void Should_ApplyProportionalBrake_When_ObstacleIsBelowSafeDistance() {
+        // در سرعت 80، فاصله امن 40 متر است؛ در فاصله 30 متر باید 25% ترمز بگیرد
+        obstacleSensor = obstacleSensorReturning(30.0);
+        autoDriver = createAutoDriver();
+
+        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
+
+        assertEquals(AdaptiveCruise.Mode.BRAKE, result.cruiseMode());
+        assertEquals(25.0, result.brakePressure(), DELTA);
+        assertFalse(result.warningActive());
+    }
+
+    @Test
+    void Should_ApplyEmergencyBrakeAndActivateWarning_When_ObstacleIsAtEmergencyDistance() {
+        // در سرعت 80، فاصله اضطراری 20 متر است
+        obstacleSensor = obstacleSensorReturning(20.0);
+        autoDriver = createAutoDriver();
+
+        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
+
+        assertEquals(AdaptiveCruise.Mode.EMERGENCY_BRAKE, result.cruiseMode());
+        assertEquals(100.0, result.brakePressure(), DELTA);
+        assertTrue(result.warningActive());
+    }
+
+    @Test
+    void Should_EnterSafeMode_When_SpeedSensorFails() {
         speedSensor = failingSpeedSensor();
         autoDriver = createAutoDriver();
 
@@ -79,8 +159,18 @@ class AutoDriverTest {
     }
 
     @Test
-    void tick_whenObstacleSensorFails_entersSafeMode() {
+    void Should_EnterSafeMode_When_ObstacleSensorFails() {
         obstacleSensor = failingObstacleSensor();
+        autoDriver = createAutoDriver();
+
+        AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
+
+        assertSafeModeResult(result);
+    }
+
+    @Test
+    void Should_EnterSafeMode_When_LaneSensorFails() {
+        laneSensor = failingLaneSensor();
         autoDriver = createAutoDriver();
 
         AutoDriver.DriveResult result = autoDriver.tick(GearBox.Gear.D);
@@ -91,8 +181,8 @@ class AutoDriverTest {
     private void assertSafeModeResult(AutoDriver.DriveResult result) {
         assertAll(
                 () -> assertTrue(result.safeMode()),
-                () -> assertEquals(SAFE_MODE_BRAKE_PRESSURE, result.brakePressure()),
-                () -> assertEquals(NO_STEERING_ANGLE, result.steeringAngleDegrees()),
+                () -> assertEquals(SAFE_MODE_BRAKE_PRESSURE, result.brakePressure(), DELTA),
+                () -> assertEquals(NO_STEERING_ANGLE, result.steeringAngleDegrees(), DELTA),
                 () -> assertEquals(AdaptiveCruise.Mode.BRAKE, result.cruiseMode()),
                 () -> assertFalse(result.warningActive())
         );
@@ -108,47 +198,32 @@ class AutoDriverTest {
     }
 
     private SpeedSensor speedSensorReturning(double speedKmh) {
-        return new SpeedSensor() {
-            @Override
-            public double getSpeedKmh() {
-                return speedKmh;
-            }
-        };
+        return () -> speedKmh;
     }
 
     private ObstacleSensor obstacleSensorReturning(double distanceMeters) {
-        return new ObstacleSensor() {
-            @Override
-            public double getDistanceMeters() {
-                return distanceMeters;
-            }
-        };
+        return () -> distanceMeters;
     }
 
     private LaneSensor laneSensorReturning(double laneOffsetMeters) {
-        return new LaneSensor() {
-            @Override
-            public double getLaneOffsetMeters() {
-                return laneOffsetMeters;
-            }
-        };
+        return () -> laneOffsetMeters;
     }
 
     private SpeedSensor failingSpeedSensor() {
-        return new SpeedSensor() {
-            @Override
-            public double getSpeedKmh() {
-                throw new SensorFailureException(SPEED_SENSOR_FAILURE_MESSAGE);
-            }
+        return () -> {
+            throw new SensorFailureException(SPEED_SENSOR_FAILURE_MESSAGE);
         };
     }
 
     private ObstacleSensor failingObstacleSensor() {
-        return new ObstacleSensor() {
-            @Override
-            public double getDistanceMeters() {
-                throw new SensorFailureException(OBSTACLE_SENSOR_FAILURE_MESSAGE);
-            }
+        return () -> {
+            throw new SensorFailureException(OBSTACLE_SENSOR_FAILURE_MESSAGE);
+        };
+    }
+
+    private LaneSensor failingLaneSensor() {
+        return () -> {
+            throw new SensorFailureException(LANE_SENSOR_FAILURE_MESSAGE);
         };
     }
 }
