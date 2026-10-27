@@ -20,6 +20,9 @@ class AdaptiveCruiseTest {
     private static final double EMERGENCY_DISTANCE_METERS = 20.0;
     private static final double RELEASE_DISTANCE_METERS = 48.0;
     private static final double INTERMEDIATE_DISTANCE_METERS = 45.0;
+    private static final double MODERATE_BRAKE_DISTANCE_METERS = 30.0;
+    private static final double HYSTERESIS_BRAKE_PRESSURE = 10.0;
+    private static final double MAX_ACCELERATION_STEP_KMH = 5.0;
 
     private AdaptiveCruise cruise;
 
@@ -70,8 +73,7 @@ class AdaptiveCruiseTest {
             Double.POSITIVE_INFINITY,
             Double.NEGATIVE_INFINITY
     })
-    void Should_RejectInvalidSpeedAndPreserveBraking_When_UpdateSpeedIsInvalid(
-            double invalidSpeed) {
+    void Should_RejectInvalidSpeedAndPreserveBraking_When_UpdateSpeedIsInvalid(double invalidSpeed) {
 
         cruise.update(
                 TEST_SPEED_KMH,
@@ -138,65 +140,33 @@ class AdaptiveCruiseTest {
     }
 
 
-    @Test
-    void Should_ClearBrakingState_When_DistanceReachesReleaseThreshold() {
-
-        cruise.update(
-                TEST_SPEED_KMH,
-                EMERGENCY_DISTANCE_METERS
-        );
-
-        AdaptiveCruise.Decision beforeRelease = cruise.update(
-                TEST_SPEED_KMH,
-                INTERMEDIATE_DISTANCE_METERS
-        );
-
-        assertDecision(beforeRelease, AdaptiveCruise.Mode.BRAKE, 10.0);
-
-        AdaptiveCruise.Decision atRelease = cruise.update(
-                TEST_SPEED_KMH,
-                RELEASE_DISTANCE_METERS
-        );
-
-        assertDecision(atRelease, AdaptiveCruise.Mode.ACCELERATE, 5.0);
+        @Test
+        void Should_ClearBrakingState_When_DistanceReachesReleaseThreshold() {
+        cruise.update(TEST_SPEED_KMH, EMERGENCY_DISTANCE_METERS);
+        cruise.update(TEST_SPEED_KMH, RELEASE_DISTANCE_METERS);
 
         AdaptiveCruise.Decision afterRelease = cruise.update(
                 TEST_SPEED_KMH,
                 INTERMEDIATE_DISTANCE_METERS
         );
 
-        assertDecision(afterRelease, AdaptiveCruise.Mode.ACCELERATE, 5.0);
-    }
+        assertDecision(afterRelease, AdaptiveCruise.Mode.ACCELERATE, MAX_ACCELERATION_STEP_KMH);
+        }
 
 
-    @Test
-    void Should_RestoreHysteresis_When_BrakingStartsAgainAfterRelease() {
-
-        cruise.update(
-                TEST_SPEED_KMH,
-                EMERGENCY_DISTANCE_METERS
-        );
-
-        cruise.update(
-                TEST_SPEED_KMH,
-                RELEASE_DISTANCE_METERS
-        );
-
-        AdaptiveCruise.Decision newBrake = cruise.update(
-                TEST_SPEED_KMH,
-                30.0
-        );
-
-        assertDecision(newBrake, AdaptiveCruise.Mode.BRAKE, 25.0);
+        @Test
+        void Should_RestoreHysteresis_When_BrakingStartsAgainAfterRelease() {
+        cruise.update(TEST_SPEED_KMH, EMERGENCY_DISTANCE_METERS);
+        cruise.update(TEST_SPEED_KMH, RELEASE_DISTANCE_METERS);
+        cruise.update(TEST_SPEED_KMH, MODERATE_BRAKE_DISTANCE_METERS); 
 
         AdaptiveCruise.Decision hysteresis = cruise.update(
                 TEST_SPEED_KMH,
                 INTERMEDIATE_DISTANCE_METERS
         );
 
-        assertDecision(hysteresis, AdaptiveCruise.Mode.BRAKE, 10.0);
-    }
-
+        assertDecision(hysteresis, AdaptiveCruise.Mode.BRAKE, HYSTERESIS_BRAKE_PRESSURE); // 10.0
+        }
 
     @ParameterizedTest(
             name = "{index}: speed={0}, distance={1}, wasBraking={2}"
